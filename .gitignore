@@ -12,3 +12,6 @@ db/
 # OS-specific files
 .DS_Store
 Thumbs.db
+
+# Environmental file
+.env
