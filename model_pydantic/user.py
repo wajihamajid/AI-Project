@@ -1,13 +1,45 @@
-from pydantic import BaseModel, Field, EmailStr
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 class UserCreate(BaseModel):
-    email: EmailStr = Field(..., description="The email address of the user")
-    password_hash: str = Field(..., description="The hashed password of the user")
+    email: EmailStr = Field(
+        ...,
+        max_length=320,
+        description="The user's email address",
+    )
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=128,
+        description="The user's plaintext password, supplied for hashing",
+    )
 
-class UserRead(BaseModel):
-    id: int = Field(..., description="The unique idenitifier of the user")
-    email: EmailStr = Field(..., description="The email address of the user")
 
-    class config():
-        from_attributes = True
-        extra = "forbid"
+class UserLogin(BaseModel):
+    email: EmailStr = Field(
+        ...,
+        max_length=320,
+        description="The user's email address",
+    )
+    password: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        description="The user's password",
+    )
+
+
+class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: EmailStr
+    is_active: bool
+    created_at: datetime
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
