@@ -32,5 +32,4 @@ MAX_OVERFLOW = settings.Max_Overflow
 TIMEOUT = settings.timeout
 
 # Quick test print to make sure it loads
-print(f"Successfully loaded Database URL: {DATABASE_URL}")
 print(f"Max Connections: {MAX_CONNECTION}")
