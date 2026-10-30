@@ -7,7 +7,7 @@ from db.base import settings
 engine = create_engine(settings.DATABASE_URL, pool_size=settings.Max_Connection, max_overflow=settings.Max_Overflow, pool_timeout= settings.timeout)
 
 session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-print(f"Successfully created SQLAlchemy engine with URL: {settings.DATABASE_URL}")
+print(f"Successfully created SQLAlchemy engine with URL")
 
 Base = declarative_base()
 # print(settings.DATABASE_URL)

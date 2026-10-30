@@ -1,6 +1,12 @@
 import os
+from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parent  # points to /db
+# If your .env is in 'AI-Project', go up one level: BASE_DIR.parent / ".env"
+ENV_PATH = BASE_DIR.parent / ".env"
 
 # 1. Define your Settings Schema
 class Settings(BaseSettings):
@@ -11,7 +17,7 @@ class Settings(BaseSettings):
 
     # This replaces the old 'class Config' format in Pydantic v2
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_PATH,
         env_file_encoding="utf-8",
         extra="ignore" # Prevents errors if your .env has other variables
     )
@@ -26,5 +32,5 @@ MAX_OVERFLOW = settings.Max_Overflow
 TIMEOUT = settings.timeout
 
 # Quick test print to make sure it loads
-# print(f"Successfully loaded Database URL: {DATABASE_URL}")
-# print(f"Max Connections: {MAX_CONNECTION}")
+print(f"Successfully loaded Database URL: {DATABASE_URL}")
+print(f"Max Connections: {MAX_CONNECTION}")

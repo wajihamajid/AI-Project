@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     JSON,
     String,
@@ -27,20 +28,17 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(
         String(320), unique=True, nullable=False
-    )  # Unique email identifies each account.
-    password_hash: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Store a password hash, never a plaintext password.
+    )
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False
-    )  # New accounts are active by default.
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-    )  # The database records when the account was created.
+    )
 
-    # A user has at most one profile.
     profile: Mapped[UserProfile | None] = relationship(
         back_populates="user"
     )
@@ -56,6 +54,9 @@ class User(Base):
     job_descriptions: Mapped[list[JobDescription]] = relationship(
         back_populates="user"
     )
+    match_results: Mapped[list[MatchResult]] = relationship(
+        back_populates="user"
+    )
 
 
 class UserProfile(Base):
@@ -64,14 +65,12 @@ class UserProfile(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"), unique=True, nullable=False
-    )  # UNIQUE enforces one profile per user at database level.
+    )
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     phone: Mapped[str | None] = mapped_column(String, nullable=True)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
     headline: Mapped[str | None] = mapped_column(String, nullable=True)
-    links: Mapped[dict | None] = mapped_column(
-        JSON, nullable=True
-    )  # Stores structured links such as LinkedIn and GitHub.
+    links: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="profile")
 
@@ -82,30 +81,20 @@ class Document(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
-    )  # Index helps retrieve a user's documents efficiently.
-    original_filename: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Preserve the uploaded filename without its typo.
-    storage_path: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Store a controlled storage key or path, not arbitrary user input.
+    )
+    original_filename: Mapped[str] = mapped_column(String, nullable=False)
+    storage_path: Mapped[str] = mapped_column(String, nullable=False)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
-    file_hash: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )  # SHA-256 hashes are 64 hexadecimal characters.
-    source_type: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Identifies where the document originated.
+    file_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_type: Mapped[str] = mapped_column(String, nullable=False)
     source_reference: Mapped[str | None] = mapped_column(
         String, nullable=True
     )
     status: Mapped[str] = mapped_column(
         String, default="pending", nullable=False
-    )  # Tracks the document processing lifecycle.
-    error_message: Mapped[str | None] = mapped_column(
-        Text, nullable=True
     )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     extraction_method: Mapped[str | None] = mapped_column(
         String, nullable=True
     )
@@ -116,18 +105,26 @@ class Document(Base):
     )
 
     __table_args__ = (
-        # Prevents the same user from uploading identical content twice.
         UniqueConstraint(
-            "user_id", "file_hash", name="uq_documents_user_file_hash"
+            "user_id",
+            "file_hash",
+            name="uq_documents_user_file_hash",
         ),
         CheckConstraint(
-            "file_size >= 0", name="ck_documents_file_size_nonnegative"
+            "file_size >= 0",
+            name="ck_documents_file_size_nonnegative",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "id",
+            name="uq_documents_user_id_id",
         ),
     )
 
     user: Mapped[User] = relationship(back_populates="documents")
     evidence_items: Mapped[list[EvidenceItem]] = relationship(
-        back_populates="document"
+        back_populates="document",
+        foreign_keys="EvidenceItem.document_id",
     )
 
 
@@ -139,35 +136,31 @@ class EvidenceItem(Base):
         ForeignKey("users.id"), nullable=False, index=True
     )
     document_id: Mapped[int] = mapped_column(
-        ForeignKey("documents.id"), nullable=False, index=True
-    )  # Links extracted evidence to its source document.
+        Integer, nullable=False, index=True
+    )
     evidence_type: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     organization: Mapped[str | None] = mapped_column(String, nullable=True)
     role: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     highlights: Mapped[str | None] = mapped_column(Text, nullable=True)
-    skills: Mapped[dict | None] = mapped_column(
-        JSON, nullable=True
-    )  # Stores structured skills extracted by the AI.
-    start_date: Mapped[date | None] = mapped_column(
-        Date, nullable=True
-    )  # Employment and education dates usually do not need times.
+    skills: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_current: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
     location: Mapped[str | None] = mapped_column(String, nullable=True)
-    attributes: Mapped[dict | None] = mapped_column(
-        JSON, nullable=True
-    )  # Stores additional structured evidence attributes.
+    attributes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     confidence_score: Mapped[float | None] = mapped_column(
         Float, nullable=True
-    )  # Allows fractional scores such as 0.87.
+    )
     embeddings: Mapped[list[float] | None] = mapped_column(
         JSON, nullable=True
-    )  # JSON is acceptable for a prototype; consider pgvector later.
-    embedding_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    )
+    embedding_model: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )
     status: Mapped[str] = mapped_column(
         String, default="pending", nullable=False
     )
@@ -182,11 +175,73 @@ class EvidenceItem(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
-    )  # onupdate refreshes this value when SQLAlchemy updates the row.
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "document_id"],
+            ["documents.user_id", "documents.id"],
+            name="fk_evidence_items_document_owner",
+        ),
+        CheckConstraint(
+            "confidence_score IS NULL OR "
+            "(confidence_score >= 0 AND confidence_score <= 1)",
+            name="ck_evidence_items_confidence_score_range",
+        ),
+        CheckConstraint(
+            "end_date IS NULL OR start_date IS NULL OR end_date >= start_date",
+            name="ck_evidence_items_date_range",
+        ),
+    )
 
     user: Mapped[User] = relationship(back_populates="evidence_items")
     document: Mapped[Document] = relationship(
-        back_populates="evidence_items"
+        back_populates="evidence_items",
+        foreign_keys=[document_id],
+        primaryjoin="and_(EvidenceItem.document_id == Document.id, "
+        "EvidenceItem.user_id == Document.user_id)",
+    )
+
+
+class JobDescription(Base):
+    __tablename__ = "job_descriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    company: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parsed_requirements: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True
+    )
+    skills: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    analysis_status: Mapped[str] = mapped_column(
+        String, default="pending", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "id",
+            name="uq_job_descriptions_user_id_id",
+        ),
+    )
+
+    user: Mapped[User] = relationship(back_populates="job_descriptions")
+    resumes: Mapped[list[Resume]] = relationship(
+        back_populates="job_description",
+        foreign_keys="Resume.job_description_id",
+    )
+    match_results: Mapped[list[MatchResult]] = relationship(
+        back_populates="job_description",
+        foreign_keys="MatchResult.job_description_id",
     )
 
 
@@ -198,20 +253,20 @@ class Resume(Base):
         ForeignKey("users.id"), nullable=False, index=True
     )
     job_description_id: Mapped[int] = mapped_column(
-        ForeignKey("job_descriptions.id"), nullable=False, index=True
-    )  # Identifies the job description this resume targets.
+        Integer, nullable=False, index=True
+    )
     label: Mapped[str] = mapped_column(String, nullable=False)
     template: Mapped[str | None] = mapped_column(String, nullable=True)
     content: Mapped[str | None] = mapped_column(
         Text, nullable=True
-    )  # Stores generated resume content.
+    )  # Keep this as Text if your API stores serialized text.
     version: Mapped[int] = mapped_column(
         Integer, default=1, nullable=False
-    )  # Every saved resume starts at version 1.
+    )
     file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     used_evidence_items: Mapped[list[int] | None] = mapped_column(
         JSON, nullable=True
-    )  # Stores the IDs of evidence items used during generation.
+    )
     status: Mapped[str] = mapped_column(
         String, default="pending", nullable=False
     )
@@ -229,7 +284,11 @@ class Resume(Base):
     )
 
     __table_args__ = (
-        # Prevent duplicate version numbers for the same user and job.
+        ForeignKeyConstraint(
+            ["user_id", "job_description_id"],
+            ["job_descriptions.user_id", "job_descriptions.id"],
+            name="fk_resumes_job_description_owner",
+        ),
         UniqueConstraint(
             "user_id",
             "job_description_id",
@@ -237,34 +296,41 @@ class Resume(Base):
             name="uq_resumes_user_job_version",
         ),
         CheckConstraint(
-            "version >= 1", name="ck_resumes_version_positive"
+            "version >= 1",
+            name="ck_resumes_version_positive",
         ),
     )
 
     user: Mapped[User] = relationship(back_populates="resumes")
     job_description: Mapped[JobDescription] = relationship(
-        back_populates="resumes"
+        back_populates="resumes",
+        foreign_keys=[job_description_id],
+        primaryjoin="and_(Resume.job_description_id == "
+        "JobDescription.id, Resume.user_id == JobDescription.user_id)",
     )
 
 
-class JobDescription(Base):
-    __tablename__ = "job_descriptions"
+class MatchResult(Base):
+    __tablename__ = "match_results"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id"), nullable=False, index=True
     )
-    title: Mapped[str] = mapped_column(String, nullable=False)
-    company: Mapped[str | None] = mapped_column(String, nullable=True)
-    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    parsed_requirements: Mapped[dict | None] = mapped_column(
-        JSON, nullable=True
-    )  # Structured AI output is easier to query than serialized text.
-    skills: Mapped[dict | None] = mapped_column(
-        JSON, nullable=True
-    )  # Stores extracted job skills and related metadata.
-    analysis_status: Mapped[str] = mapped_column(
-        String, default="pending", nullable=False
+    document_id: Mapped[int] = mapped_column(
+        Integer, nullable=False, index=True
+    )
+    job_description_id: Mapped[int] = mapped_column(
+        Integer, nullable=False, index=True
+    )
+    matching_score: Mapped[float] = mapped_column(
+        Float, nullable=False
+    )
+    matching_skills: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list
+    )
+    missing_skills: Mapped[list | None] = mapped_column(
+        JSON, nullable=True, default=None
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -272,7 +338,32 @@ class JobDescription(Base):
         nullable=False,
     )
 
-    user: Mapped[User] = relationship(back_populates="job_descriptions")
-    resumes: Mapped[list[Resume]] = relationship(
-        back_populates="job_description"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "document_id"],
+            ["documents.user_id", "documents.id"],
+            name="fk_match_results_document_owner",
+        ),
+        ForeignKeyConstraint(
+            ["user_id", "job_description_id"],
+            ["job_descriptions.user_id", "job_descriptions.id"],
+            name="fk_match_results_job_owner",
+        ),
+        CheckConstraint(
+            "matching_score >= 0 AND matching_score <= 100",
+            name="ck_match_results_score_range",
+        ),
+    )
+
+    user: Mapped[User] = relationship(back_populates="match_results")
+    document: Mapped[Document] = relationship(
+        foreign_keys=[document_id],
+        primaryjoin="and_(MatchResult.document_id == Document.id, "
+        "MatchResult.user_id == Document.user_id)",
+    )
+    job_description: Mapped[JobDescription] = relationship(
+        back_populates="match_results",
+        foreign_keys=[job_description_id],
+        primaryjoin="and_(MatchResult.job_description_id == "
+        "JobDescription.id, MatchResult.user_id == JobDescription.user_id)",
     )
